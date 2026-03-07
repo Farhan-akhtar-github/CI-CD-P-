@@ -9,12 +9,16 @@ def create_app():
     application = Flask(__name__)
 
     # Configure logging
+    valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
     log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+    if log_level not in valid_levels:
+        log_level = "INFO"
     logging.basicConfig(
-        level=getattr(logging, log_level, logging.INFO),
+        level=getattr(logging, log_level),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     logger = logging.getLogger(__name__)
+    logger.info("Application starting with log level: %s", log_level)
 
     @application.after_request
     def set_security_headers(response):
