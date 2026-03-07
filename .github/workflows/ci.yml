@@ -1,4 +1,4 @@
-name: CI-CD Pipeline
+name: CI Pipeline
 
 on:
   push:
@@ -7,8 +7,10 @@ on:
 
 jobs:
   ci:
-    name: CI - Test, Build & Push Docker Image
+    name: Lint, Test, Build, Scan & Push Docker Image
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code
@@ -22,47 +24,39 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Lint with flake8
+        run: |
+          flake8 app.py tests/
 
       - name: Run unit tests
         run: |
-          pytest tests/
+          pytest tests/ -v
 
       - name: Login to Docker Hub
-        run: |
-          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login \
-            -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build Docker image
+      - name: Build and tag Docker image
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/ci-cd-clean-app:latest .
+          IMAGE=${{ secrets.DOCKER_USERNAME }}/ci-cd-clean-app
+          docker build -t ${IMAGE}:latest -t ${IMAGE}:${{ github.sha }} .
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: 'image'
+          image-ref: '${{ secrets.DOCKER_USERNAME }}/ci-cd-clean-app:${{ github.sha }}'
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
 
       - name: Push Docker image
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/ci-cd-clean-app:latest
-
-  cd:
-    name: CD - Deploy to EC2
-    runs-on: ubuntu-latest
-    needs: ci
-
-    steps:
-      - name: Deploy application to EC2
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            docker stop ci-cd-clean-app || true
-            docker rm ci-cd-clean-app || true
-            docker pull ${{ secrets.DOCKER_USERNAME }}/ci-cd-clean-app:latest
-            docker run -d \
-              --name ci-cd-clean-app \
-              -p 5000:5000 \
-              ${{ secrets.DOCKER_USERNAME }}/ci-cd-clean-app:latest
-
-
-
-
+          IMAGE=${{ secrets.DOCKER_USERNAME }}/ci-cd-clean-app
+          docker push ${IMAGE}:latest
+          docker push ${IMAGE}:${{ github.sha }}
 
