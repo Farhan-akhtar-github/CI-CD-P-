@@ -20,6 +20,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
@@ -40,10 +41,27 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and tag Docker image
-        run: |
-          IMAGE=${{ secrets.DOCKER_USERNAME }}/ci-cd-clean-app
-          docker build -t ${IMAGE}:latest -t ${IMAGE}:${{ github.sha }} .
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image (with layer caching)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/ci-cd-clean-app:latest
+            ${{ secrets.DOCKER_USERNAME }}/ci-cd-clean-app:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Cache Trivy DB
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.trivy-cache
+          key: trivy-db-${{ hashFiles('.github/workflows/ci.yml') }}
+          restore-keys: |
+            trivy-db-
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.28.0
@@ -53,6 +71,7 @@ jobs:
           format: 'table'
           exit-code: '1'
           severity: 'CRITICAL,HIGH'
+          cache-dir: /tmp/.trivy-cache
 
       - name: Push Docker image
         run: |
