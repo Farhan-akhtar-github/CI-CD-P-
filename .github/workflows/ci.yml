@@ -55,11 +55,15 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Get current week for Trivy cache rotation
+        id: week
+        run: echo "week=$(date +%Y-%U)" >> "$GITHUB_OUTPUT"
+
       - name: Cache Trivy DB
         uses: actions/cache@v4
         with:
           path: /tmp/.trivy-cache
-          key: trivy-db-${{ hashFiles('.github/workflows/ci.yml') }}
+          key: trivy-db-${{ steps.week.outputs.week }}
           restore-keys: |
             trivy-db-
 
