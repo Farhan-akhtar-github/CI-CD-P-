@@ -95,16 +95,20 @@ Triggered on every push to `main`:
 1. **Lint** — Flake8 static analysis
 2. **Test** — Pytest unit tests
 3. **Build** — Docker image with layer caching (tagged `latest` and commit SHA)
-4. **Scan** — Trivy vulnerability scanner (fails on CRITICAL/HIGH)
-5. **Push** — Publish image to Docker Hub
+4. **Smoke test** — Run container and verify `/health` endpoint
+5. **Scan** — Trivy vulnerability scanner (fails on CRITICAL/HIGH)
+6. **Push** — Publish image to Docker Hub
 
 ### CD (`.github/workflows/cd.yml`)
 
-Triggered automatically when the CI pipeline succeeds on `main`:
+Triggered automatically when the CI pipeline succeeds on `main`. Uses a **zero-downtime deployment** strategy:
 
-1. SSH into EC2 instance
-2. Pull the new Docker image (tagged with commit SHA)
-3. Restart the application container
+1. Pull the new Docker image while the old container is still serving traffic
+2. Start the new container on a temporary port (`5001`)
+3. Run health checks against the new container (up to 30 attempts)
+4. If healthy — stop old container, launch new container on production port (`5000`)
+5. If unhealthy — remove new container, keep old container running (automatic rollback)
+6. Verify the production container is healthy after the swap
 
 ### Required Secrets
 
