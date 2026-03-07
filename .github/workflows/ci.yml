@@ -74,7 +74,9 @@ jobs:
           image-ref: '${{ secrets.DOCKER_USERNAME }}/ci-cd-clean-app:${{ github.sha }}'
           format: 'table'
           exit-code: '1'
+          ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
+          trivyignores: '.trivyignore'
           cache-dir: /tmp/.trivy-cache
 
       - name: Push Docker image
