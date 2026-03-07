@@ -1,6 +1,51 @@
 # CI/CD Flask Application
 
+![CI Pipeline](https://github.com/Farhan-akhtar-github/CI-CD-P-/actions/workflows/ci.yml/badge.svg)
+![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)
+![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)
+![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)
+
 A production-ready Flask application with a complete CI/CD pipeline using GitHub Actions, Docker, and AWS EC2.
+
+## Highlights
+
+- Production-style CI/CD pipeline
+- Dockerized Flask application using Gunicorn
+- Security scanning using Trivy
+- Automatic deployment to AWS EC2
+- Zero-downtime deployment with health checks
+- Container auto-restart using Docker restart policies
+
+## Architecture
+
+```
+Developer Push
+      │
+      ▼
+GitHub Repository
+      │
+      ▼
+GitHub Actions CI
+ ├ Lint
+ ├ Test
+ ├ Build
+ └ Security Scan
+      │
+      ▼
+Docker Hub
+      │
+      ▼
+GitHub Actions CD
+      │
+      ▼
+AWS EC2
+      │
+      ▼
+Docker Container
+      │
+      ▼
+Health Check
+```
 
 ## Features
 
