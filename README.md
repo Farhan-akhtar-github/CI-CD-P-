@@ -139,22 +139,22 @@ The container runs as a non-root user and includes a health check on the `/healt
 Triggered on every push to `main`. The pipeline is organized into **four stages** with **parallel jobs** to maximize speed without sacrificing safety:
 
 ```
-┌───────────────────────────────────────────────────────┐
-│  Stage 1 (parallel)  │  lint ───┐                     │
-│                      │          ├──▶ Stage 2: build   │
-│                      │  test ───┘         │           │
-│                      │            ┌───────┴────────┐  │
-│  Stage 3 (parallel)  │         scan           smoke-test │
-│                      │            └───────┬────────┘  │
-│  Stage 4             │                  push          │
-└───────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│  Stage 1 (parallel)  │  lint ───┐                   │
+│                      │          ├──▶ Stage 2: build  │
+│                      │  test ───┘         │          │
+│                      │              ┌─────┴──────┐   │
+│  Stage 3 (parallel)  │           scan       smoke-test│
+│                      │              └─────┬──────┘   │
+│  Stage 4             │                  push         │
+└─────────────────────────────────────────────────────┘
 ```
 
 | Stage | Jobs | Runs | Description |
 |-------|------|------|-------------|
-| 1 | **Lint** ‖ **Test** | In parallel | Flake8 static analysis and Pytest unit tests run simultaneously |
+| 1 | **Lint** and **Test** | In parallel | Flake8 static analysis and Pytest unit tests run simultaneously |
 | 2 | **Build** | After Stage 1 | Docker image built with layer caching, tagged `latest` and commit SHA, saved as an artifact |
-| 3 | **Scan** ‖ **Smoke Test** | In parallel | Trivy vulnerability scan (fails on CRITICAL/HIGH) and container health-check run simultaneously, both loading the artifact from Stage 2 |
+| 3 | **Scan** and **Smoke Test** | In parallel | Trivy vulnerability scan (fails on CRITICAL/HIGH) and container health-check run simultaneously, both loading the artifact from Stage 2 |
 | 4 | **Push** | After Stage 3 | Publish image to Docker Hub once scan and smoke test both pass |
 
 #### Why parallel jobs?
