@@ -9,9 +9,10 @@ A production-ready Flask application with a complete CI/CD pipeline using GitHub
 
 ## Highlights
 
-- Production-style CI/CD pipeline
+- Production-style CI/CD pipeline with parallel jobs for faster feedback
 - Dockerized Flask application using Gunicorn
 - Security scanning using Trivy
+- Docker image artifact sharing across CI jobs
 - Automatic deployment to AWS EC2
 - Zero-downtime deployment with health checks
 - Container auto-restart using Docker restart policies
@@ -26,10 +27,10 @@ GitHub Repository
       │
       ▼
 GitHub Actions CI
- ├ Lint
- ├ Test
- ├ Build
- └ Security Scan
+ ├ Lint ──────┐
+ │            ├──▶ Build ──┬──▶ Scan ─────────┐
+ └ Test ──────┘            │                   ├──▶ Push
+                           └──▶ Smoke Test ────┘
       │
       ▼
 Docker Hub
@@ -53,7 +54,7 @@ Health Check
 - **Gunicorn** WSGI server for production
 - **Security headers** (X-Content-Type-Options, X-Frame-Options, X-XSS-Protection)
 - **Dockerized** with non-root user and health checks
-- **CI pipeline** — lint, test, build, security scan, and push
+- **CI pipeline** — parallel lint & test, build, parallel scan & smoke test, and push
 - **CD pipeline** — automatic deployment to EC2 on successful CI
 
 ## Project Structure
@@ -135,14 +136,33 @@ The container runs as a non-root user and includes a health check on the `/healt
 
 ### CI (`.github/workflows/ci.yml`)
 
-Triggered on every push to `main`:
+Triggered on every push to `main`. The pipeline is organized into **four stages** with **parallel jobs** to maximize speed without sacrificing safety:
 
-1. **Lint** — Flake8 static analysis
-2. **Test** — Pytest unit tests
-3. **Build** — Docker image with layer caching (tagged `latest` and commit SHA)
-4. **Smoke test** — Run container and verify `/health` endpoint
-5. **Scan** — Trivy vulnerability scanner (fails on CRITICAL/HIGH)
-6. **Push** — Publish image to Docker Hub
+```
+┌───────────────────────────────────────────────────────┐
+│  Stage 1 (parallel)  │  lint ───┐                     │
+│                      │          ├──▶ Stage 2: build   │
+│                      │  test ───┘         │           │
+│                      │            ┌───────┴────────┐  │
+│  Stage 3 (parallel)  │         scan           smoke-test │
+│                      │            └───────┬────────┘  │
+│  Stage 4             │                  push          │
+└───────────────────────────────────────────────────────┘
+```
+
+| Stage | Jobs | Runs | Description |
+|-------|------|------|-------------|
+| 1 | **Lint** ‖ **Test** | In parallel | Flake8 static analysis and Pytest unit tests run simultaneously |
+| 2 | **Build** | After Stage 1 | Docker image built with layer caching, tagged `latest` and commit SHA, saved as an artifact |
+| 3 | **Scan** ‖ **Smoke Test** | In parallel | Trivy vulnerability scan (fails on CRITICAL/HIGH) and container health-check run simultaneously, both loading the artifact from Stage 2 |
+| 4 | **Push** | After Stage 3 | Publish image to Docker Hub once scan and smoke test both pass |
+
+#### Why parallel jobs?
+
+- **Faster feedback** — Lint and test run at the same time, so developers get results sooner.
+- **Independent checks** — Security scanning and smoke testing have no dependency on each other, so they run concurrently after the build.
+- **Artifact sharing** — The Docker image is built once in Stage 2 and shared via `actions/upload-artifact` / `actions/download-artifact`, avoiding redundant builds while still enabling parallel consumers.
+- **Fail-fast safety** — If either parallel job in a stage fails, the subsequent stage is skipped entirely.
 
 ### CD (`.github/workflows/cd.yml`)
 
